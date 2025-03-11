@@ -11,6 +11,7 @@ from tensorflow.keras.preprocessing.image import img_to_array
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.callbacks import ReduceLROnPlateau
 
 # Ensure UTF-8 encoding
 sys.stdout.reconfigure(encoding='utf-8')
@@ -79,6 +80,7 @@ test_df['forged_path'] = test_df['forged_path'].astype(str).apply(lambda x: x.en
 X_train, y_train = load_images(train_df, dataset_name="Train")
 X_test, y_test = load_images(test_df, dataset_name="Test")
 
+
 # Convert labels to categorical (if using categorical_crossentropy loss)
 y_train = to_categorical(y_train, num_classes=2)
 y_test = to_categorical(y_test, num_classes=2)
@@ -95,6 +97,18 @@ print(f"X_test: {X_test.shape}, y_test: {y_test.shape}")
 y_train = y_train.astype("float32")
 y_val = y_val.astype("float32")
 y_test = y_test.astype("float32")
+
+# Data Augmentation
+datagen = ImageDataGenerator(
+    rotation_range=10,
+    width_shift_range=0.1,
+    height_shift_range=0.1,
+    shear_range=0.1,
+    zoom_range=0.1,
+    horizontal_flip=True
+)
+datagen.fit(X_train)
+
 
 # Define CNN model
 model = Sequential([
@@ -113,8 +127,18 @@ model = Sequential([
 # Compile model
 model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
+# Learning rate adjustment
+lr_scheduler = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=3, verbose=1)
+
+
 # Train model
-model.fit(X_train, y_train, epochs=10, validation_data=(X_val, y_val))
+history = model.fit(
+    datagen.flow(X_train, y_train, batch_size=32),
+    epochs=20,
+    validation_data=(X_val, y_val),
+    callbacks=[lr_scheduler]  # Include learning rate scheduler
+)
+
 
 # Save model
 model.save("backend/model/signature_model.h5")
