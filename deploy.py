@@ -1,5 +1,6 @@
 
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import numpy as np
 import cv2
 import tensorflow as tf
@@ -8,8 +9,8 @@ import mysql.connector
 import sys
 sys.stdout.reconfigure(encoding='utf-8')
 
-
 app = Flask(__name__)
+CORS(app)
 
 # Load the trained model
 model = tf.keras.models.load_model(r"C:\Users\vedan\Documents\My_Projects\forged_sign\backend\model\signature_model.h5")
@@ -63,24 +64,34 @@ def predict():
     genuine_label = "Genuine" if np.argmax(genuine_pred) == 0 else "Forged"
     forged_label = "Genuine" if np.argmax(forged_pred) == 0 else "Forged"
 
-    # Confidence score
-    confidence = float(max(genuine_pred) * 100)  # Convert to native float
+    # Determine the final label based on both predictions
+    if np.argmax(genuine_pred) == np.argmax(forged_pred):
+        final_label = "Genuine"
+    else:
+        final_label = "Forged"
 
+    # Confidence score (average of both predictions)
+    confidence = float((max(genuine_pred) + max(forged_pred)) / 2 * 100)
 
-    # Insert into database
-    cursor.execute(
-    "INSERT INTO predictions (genuine_path, forged_path, predicted_label, confidence) VALUES (%s, %s, %s, %s)",
-    (genuine_file.filename, forged_file.filename, genuine_label, confidence)
-)
+    # Insert into database with final label
+    try:
+        cursor.execute(
+            "INSERT INTO predictions (genuine_path, forged_path, predicted_label, confidence) VALUES (%s, %s, %s, %s)",
+            (genuine_file.filename, forged_file.filename, final_label, confidence)
+        )
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        return jsonify({'error': f"Database error: {str(e)}"}), 500
 
-    db.commit()
-
+    # Return response
     return jsonify({
-    'genuine_label': genuine_label,
-    'forged_label': forged_label,
-    'confidence': confidence
-}), 200, {'Content-Type': 'application/json; charset=utf-8'}
-
+        'success': True,
+        'genuine_label': genuine_label,
+        'forged_label': forged_label,
+        'final_label': final_label,  # Final decision based on both predictions
+        'confidence': confidence
+    }), 200, {'Content-Type': 'application/json; charset=utf-8'}
 
 if __name__ == '__main__':
     app.run(debug=True)
