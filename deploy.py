@@ -13,7 +13,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Load the trained model
-model = tf.keras.models.load_model(r"C:\Users\vedan\Documents\My_Projects\forged_sign\backend\model\signature_model.h5")
+model = tf.keras.models.load_model(r"C:\Users\vedan\Documents\My_Projects\FORGED_SIGNATURE_DETECTION\backend\model\signature_model.h5")
 model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
 # Database connection
